@@ -7,6 +7,7 @@ import time
 import pytz
 import os
 import json
+from flask import Flask
 
 # Token and data path for Railway
 TOKEN = "7059991765:AAH-vq6A4gU4Bw7tJmrjqug2Un5Nb7j1IzA"
@@ -48,17 +49,14 @@ followup_categories = {
     "10": "Brutal Honesty"
 }
 
-# Templates
 outreach_templates = {
-    "1": "Subject: Quick fix for [specific problem]...",
-    "2": "Subject: About your [post/tweet on X]...",
-    # More outreach templates here...
+    "1": "Subject: Quick fix for [specific problem]\n\nHey [First Name],\n\nNoticed you’re dealing with [specific issue]...",
+    "2": "Subject: About your [post/tweet on X]\n\nHey [First Name],\n\nSaw your post about [pain point]...",
 }
 
 followup_templates = {
-    "1": "SUBJECT: Did you see this?...",
-    "2": "SUBJECT: Saw this and thought of you...",
-    # More follow-up templates here...
+    "1": "SUBJECT: Did you see this?\n\nHey [First Name],\n\nNot sure if you got my last email...",
+    "2": "SUBJECT: Saw this and thought of you\n\nHey [First Name],\n\nSince you’re in [industry], I came across [article, tool]...",
 }
 
 # Instructions
@@ -76,10 +74,6 @@ instructions = """🎟️ How to Earn Giveaway Points:
 📩 Get Outreach Templates:
 /outreach → Choose a category
 /followups → Choose a category
-
-🔍 Stay Updated:
-/updates → Check for software updates
-/demo → See available demos (coming soon!)
 
 📋 Task Management:
 /tasks → View your tasks
@@ -148,16 +142,38 @@ def start(update: Update, context: CallbackContext):
     else:
         context.bot.send_message(chat_id=user_id, text=f"👋 Welcome back to ClientOS Insider!\n{instructions}")
 
+def giveaway(update: Update, context: CallbackContext):
+    uid = update.message.chat_id
+    context.bot.send_message(chat_id=uid, text=f"🎟️ You currently have {get_points(uid)} giveaway points.")
+
+def leaderboard(update: Update, context: CallbackContext):
+    context.bot.send_message(chat_id=update.message.chat_id, text=get_leaderboard(update.message.chat_id))
+
+def invite(update: Update, context: CallbackContext):
+    uid = update.message.chat_id
+    context.bot.send_message(chat_id=uid, text=f"🔗 Your Invite Link: https://t.me/ClientOS_Bot?start={uid}")
+
+def checkinvites(update: Update, context: CallbackContext):
+    uid = update.message.chat_id
+    joined = user_invite_count.get(uid, 0)
+    context.bot.send_message(chat_id=uid, text=f"👥 People who joined through you: {joined}\n💰 Points earned from invites: {joined * 20}")
+
+def updates(update: Update, context: CallbackContext):
+    context.bot.send_message(chat_id=update.message.chat_id, text="Click here to view updates: https://clientosupdates.crd.co ")
+
+def demo(update: Update, context: CallbackContext):
+    context.bot.send_message(chat_id=update.message.chat_id, text="Click here to view demos: https://clientosdemos.crd.co ")
+
 def outreach(update: Update, context: CallbackContext):
     uid = update.message.chat_id
     chat_state[uid] = "outreach"
-    text = "📩 Choose an Outreach Template Category:\n" + "\n".join([f"{k}. {v}" for k, v in outreach_categories.items()]) + "\n\nReply with the number."
+    text = "📩 Choose an Outreach Template Category:\n" + "\n".join([f"{k}. {v}" for k, v in outreach_categories.items()]) + "\n\nReply with the number.\n(If you want to view another template later, type /outreach again.)"
     context.bot.send_message(chat_id=uid, text=text)
 
 def followups(update: Update, context: CallbackContext):
     uid = update.message.chat_id
     chat_state[uid] = "followups"
-    text = "📩 Choose a Follow-Up Template Category:\n" + "\n".join([f"{k}. {v}" for k, v in followup_categories.items()]) + "\n\nReply with the number."
+    text = "📩 Choose a Follow-Up Template Category:\n" + "\n".join([f"{k}. {v}" for k, v in followup_categories.items()]) + "\n\nReply with the number.\n(If you want to view another template later, type /followups again.)"
     context.bot.send_message(chat_id=uid, text=text)
 
 def handle_number(update: Update, context: CallbackContext):
@@ -170,6 +186,40 @@ def handle_number(update: Update, context: CallbackContext):
         context.bot.send_message(chat_id=uid, text=followup_templates[cmd])
         chat_state[uid] = None
 
+def tasks_cmd(update: Update, context: CallbackContext):
+    uid = update.message.chat_id
+    tasklist = tasks[uid]
+    if tasklist:
+        formatted = "\n".join([f"{i+1}. {t['title']}: {t['desc']}" for i, t in enumerate(tasklist)])
+        context.bot.send_message(chat_id=uid, text=f"📋 Your Tasks:\n{formatted}")
+    else:
+        context.bot.send_message(chat_id=uid, text="📋 No tasks found.")
+
+def addtask(update: Update, context: CallbackContext):
+    uid = update.message.chat_id
+    text = update.message.text.replace("/addtask", "").strip()
+    if not text:
+        context.bot.send_message(chat_id=uid, text="⚠️ Invalid command. Type /start to see available options.")
+        return
+    parts = text.split("-", 1)
+    title = parts[0].strip()
+    desc = parts[1].strip() if len(parts) > 1 else "No description"
+    tasks[uid].append({"title": title, "desc": desc})
+    context.bot.send_message(chat_id=uid, text=f"📝 Task '{title}' added!")
+
+def completetask(update: Update, context: CallbackContext):
+    uid = update.message.chat_id
+    args = context.args
+    if args and args[0].isdigit():
+        index = int(args[0]) - 1
+        if 0 <= index < len(tasks[uid]):
+            t = tasks[uid].pop(index)
+            context.bot.send_message(chat_id=uid, text=f"✅ Task '{t['title']}' completed!")
+        else:
+            context.bot.send_message(chat_id=uid, text="⚠️ Invalid task number.")
+    else:
+        context.bot.send_message(chat_id=uid, text="⚠️ Invalid command. Type /start to see available options.")
+
 def gm(update: Update, context: CallbackContext):
     uid = update.message.chat_id
     now = datetime.utcnow()
@@ -181,15 +231,22 @@ def gm(update: Update, context: CallbackContext):
         remaining = timedelta(hours=24) - (now - user_claimed_gm[uid])
         context.bot.send_message(chat_id=uid, text=f"⚠️ You already claimed your GM point today. Try again in {str(remaining).split('.')[0]}.")
 
-def daily_scheduler(bot):
-    message = "📢 Daily Reminder:\n- Type /gm to claim your point.\n- Use /invite to earn more.\n- Check /leaderboard to see your rank."
-    while True:
-        now = datetime.now(pytz.timezone("Europe/London"))
-        if now.hour == 12 and now.minute == 0:
-            for user_id in user_points.keys():
-                bot.send_message(chat_id=user_id, text=message)
-            time.sleep(60)
-        time.sleep(1)
+def lastemail(update: Update, context: CallbackContext):
+    context.bot.send_message(chat_id=update.message.chat_id, text="📬 Latest Email:\nhttps://copyphenomenon.kit.com/posts/3-checks-before-click-send")
+
+def latesttweet(update: Update, context: CallbackContext):
+    context.bot.send_message(chat_id=update.message.chat_id, text="🐦 Latest Tweet:\nhttps://x.com/CopyPhenomenon")
+
+def fallback(update: Update, context: CallbackContext):
+    if update.message.text.startswith("/"):
+        context.bot.send_message(chat_id=update.message.chat_id, text="⚠️ Invalid command. Type /start to see available options.")
+
+# Flask app to keep the bot running on Railway
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is running!"
 
 def main():
     updater = Updater(TOKEN, use_context=True)
@@ -211,11 +268,15 @@ def main():
     dp.add_handler(CommandHandler("lastemail", lastemail))
     dp.add_handler(CommandHandler("latesttweet", latesttweet))
     dp.add_handler(MessageHandler(Filters.regex("^[0-9]+$"), handle_number))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, fallback))
 
-    threading.Thread(target=daily_scheduler, args=(updater.bot,), daemon=True).start()
+    # Webhook for Telegram
+    updater.start_webhook(listen="0.0.0.0", port=int(os.environ.get("PORT", 5000)),
+                          url_path=TOKEN)
+    updater.bot.setWebhook(f"https://clientes-production.up.railway.app/7059991765:AAH-vq6A4gU4Bw7tJmrjqug2Un5Nb7j1IzA")
 
-    updater.start_polling()
-    updater.idle()
+    threading.Thread(target=updater.start_polling, daemon=True).start()
+    app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
 
 if __name__ == '__main__':
     main()
