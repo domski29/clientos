@@ -57,20 +57,16 @@ def get_points(user_id):
 
 def get_leaderboard(user_id):
     sorted_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)
-    leaderboard = "🏆 Giveaway Leaderboard:
-"
+    leaderboard = "🏆 Giveaway Leaderboard:\n"
     for i in range(5):
         if i < len(sorted_users):
             uid, pts = sorted_users[i]
             name = user_display_names.get(uid, f"User {uid}")
-            leaderboard += f"{i+1}. {name} ({pts} points)
-"
+            leaderboard += f"{i+1}. {name} ({pts} points)\n"
         else:
-            leaderboard += f"{i+1}.
-"
+            leaderboard += f"{i+1}.\n"
     rank = next((i+1 for i, (uid, _) in enumerate(sorted_users) if uid == user_id), "N/A")
-    leaderboard += f"
-🔹 Your Rank: {rank} | Your Points: {get_points(user_id)}"
+    leaderboard += f"\n🔹 Your Rank: {rank} | Your Points: {get_points(user_id)}"
     return leaderboard
 
 def start(update: Update, context: CallbackContext):
@@ -89,13 +85,9 @@ def start(update: Update, context: CallbackContext):
 
     if user_id not in user_points:
         add_points(user_id, 10)
-        context.bot.send_message(chat_id=user_id, text=f"👋 Welcome!
-You've earned 10 giveaway points for joining!
-
-{instructions}")
+        context.bot.send_message(chat_id=user_id, text=f"👋 Welcome!\nYou've earned 10 giveaway points for joining!\n\n{instructions}")
     else:
-        context.bot.send_message(chat_id=user_id, text=f"👋 Welcome back!
-{instructions}")
+        context.bot.send_message(chat_id=user_id, text=f"👋 Welcome back!\n{instructions}")
 
 def invite(update: Update, context: CallbackContext):
     uid = update.message.chat_id
@@ -104,8 +96,7 @@ def invite(update: Update, context: CallbackContext):
 def checkinvites(update: Update, context: CallbackContext):
     uid = update.message.chat_id
     joined = user_invite_count.get(uid, 0)
-    context.bot.send_message(chat_id=uid, text=f"👥 People who joined through you: {joined}
-💰 Points earned from invites: {joined * 20}")
+    context.bot.send_message(chat_id=uid, text=f"👥 People who joined through you: {joined}\n💰 Points earned from invites: {joined * 20}")
 
 def giveaway(update: Update, context: CallbackContext):
     uid = update.message.chat_id
@@ -126,10 +117,7 @@ def gm(update: Update, context: CallbackContext):
         context.bot.send_message(chat_id=uid, text=f"⚠️ You already claimed your GM point today. Try again in {str(remaining).split('.')[0]}.")
 
 def daily_scheduler(bot):
-    message = "📢 Daily Reminder:
-Type /gm to get your point.
-Use /invite to earn more.
-Check /leaderboard to see your rank."
+    message = "📢 Daily Reminder:\nType /gm to get your point.\nUse /invite to earn more.\nCheck /leaderboard to see your rank."
     while True:
         now = datetime.now(pytz.timezone("Europe/London"))
         if now.hour == 12 and now.minute == 0:
@@ -150,8 +138,21 @@ def main():
     dp.add_handler(CommandHandler("gm", gm))
 
     threading.Thread(target=daily_scheduler, args=(updater.bot,), daemon=True).start()
+
     keep_alive()
-    updater.start_polling()
+
+    # Webhook URL
+    WEBHOOK_URL = "https://clientes-production.up.railway.app/7059991765:AAH-vq6A4gU4Bw7tJmrjqug2Un5Nb7j1IzA"
+
+    # Set webhook instead of polling
+    PORT = int(os.environ.get("PORT", 5000))
+    updater.start_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        url_path=TOKEN
+    )
+    updater.bot.set_webhook(WEBHOOK_URL)
+
     updater.idle()
 
 if __name__ == "__main__":
