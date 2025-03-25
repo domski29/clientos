@@ -2,3 +2,4 @@ python-telegram-bot==13.15
 Flask==2.0.3
 pytz==2023.3
 gunicorn
+Werkzeug==2.3.7
