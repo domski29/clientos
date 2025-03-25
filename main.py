@@ -1,3 +1,4 @@
+from flask import Flask
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 from collections import defaultdict
@@ -8,6 +9,12 @@ import pytz
 import json
 import os
 from keep_alive import keep_alive
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is running!"
 
 TOKEN = "7059991765:AAH-vq6A4gU4Bw7tJmrjqug2Un5Nb7j1IzA"
 DATA_PATH = "bot_data.json"
@@ -148,4 +155,6 @@ def main():
     updater.idle()
 
 if __name__ == "__main__":
+    from keep_alive import keep_alive
+    keep_alive()
     main()
